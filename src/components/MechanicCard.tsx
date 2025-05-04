@@ -19,6 +19,15 @@ const MechanicCard: React.FC<MechanicCardProps> = ({ mechanic }) => {
     .join('')
     .toUpperCase();
 
+  // Helper function to normalize services to array type
+  const getServicesArray = (services?: string[] | string): string[] => {
+    if (!services) return [];
+    if (typeof services === 'string') return services.split(',').map(s => s.trim());
+    return services;
+  };
+
+  const servicesArray = getServicesArray(mechanic.services);
+
   return (
     <Card className="bb-mechanic-card overflow-hidden">
       <CardHeader className="pb-2">
@@ -45,17 +54,17 @@ const MechanicCard: React.FC<MechanicCardProps> = ({ mechanic }) => {
         </div>
       </CardHeader>
       <CardContent className="pb-2">
-        {mechanic.services && mechanic.services.length > 0 && (
+        {servicesArray.length > 0 && (
           <div className="mb-3">
             <div className="flex flex-wrap gap-1.5">
-              {mechanic.services.slice(0, 3).map((service, index) => (
+              {servicesArray.slice(0, 3).map((service, index) => (
                 <Badge key={index} variant="secondary" className="text-xs">
                   {service}
                 </Badge>
               ))}
-              {mechanic.services.length > 3 && (
+              {servicesArray.length > 3 && (
                 <Badge variant="outline" className="text-xs">
-                  +{mechanic.services.length - 3} more
+                  +{servicesArray.length - 3} more
                 </Badge>
               )}
             </div>

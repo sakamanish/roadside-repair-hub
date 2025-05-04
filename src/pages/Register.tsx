@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth, UserRole } from '@/contexts/AuthContext';
@@ -49,6 +48,26 @@ const Register = () => {
       return;
     }
 
+    // For the mechanic role, ensure all required fields are filled
+    if (role === 'mechanic') {
+      if (!phoneNumber.trim()) {
+        setError('Phone number is required for mechanics');
+        return;
+      }
+      if (!address.trim()) {
+        setError('Service address is required for mechanics');
+        return;
+      }
+      if (!services.trim()) {
+        setError('At least one service must be provided');
+        return;
+      }
+      if (!availability.trim()) {
+        setError('Availability information is required');
+        return;
+      }
+    }
+
     const userData = {
       name,
       email,
@@ -61,8 +80,7 @@ const Register = () => {
           lat: 0,
           lng: 0
         },
-        // Ensure services is sent as array - this was the issue
-        services: services.split(',').map(s => s.trim()),
+        services: services,
         availability
       } : {})
     };

@@ -189,7 +189,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     try {
       // Format services correctly for the database
-      let serviceData: string[] | undefined = undefined;
+      let serviceData: string[] | undefined;
       
       if (role === 'mechanic' && userData.services) {
         // Handle services based on type
@@ -199,6 +199,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           serviceData = userData.services;
         }
       }
+      
+      console.log('Registering with data:', {
+        email: userData.email,
+        role,
+        serviceData
+      });
       
       // Create the auth user
       const { data, error } = await supabase.auth.signUp({
