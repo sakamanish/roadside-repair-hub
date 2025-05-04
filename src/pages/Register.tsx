@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth, UserRole } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import Layout from '@/components/Layout';
 import { Wrench } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 
 const Register = () => {
   const [name, setName] = useState('');
@@ -23,8 +24,16 @@ const Register = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   
-  const { register } = useAuth();
+  const { register, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/');
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,17 +44,22 @@ const Register = () => {
       return;
     }
 
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      return;
+    }
+
     const userData = {
       name,
       email,
       role,
+      phoneNumber,
       ...(role === 'mechanic' ? {
-        phoneNumber,
         location: {
           address,
-          // Mock coordinates for demo purposes - in real app would use geocoding API
-          lat: 40.7128 + (Math.random() - 0.5) * 0.05,
-          lng: -74.0060 + (Math.random() - 0.5) * 0.05
+          // Will be geocoded on the server side
+          lat: 0,
+          lng: 0
         },
         services: services.split(',').map(s => s.trim()),
         availability
@@ -55,7 +69,10 @@ const Register = () => {
     setIsSubmitting(true);
     try {
       await register(userData, password, role);
-      navigate('/');
+      toast({
+        title: "Registration successful!",
+        description: "Please check your email to confirm your account."
+      });
     } catch (error: any) {
       setError(error.message || 'Failed to register. Please try again.');
     } finally {

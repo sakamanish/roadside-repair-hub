@@ -1,6 +1,8 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { UserProfile } from './AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/components/ui/use-toast';
 
 // Define the mechanic search model
 export interface MechanicSearch {
@@ -10,64 +12,9 @@ export interface MechanicSearch {
   distance?: number;
 }
 
-// Random locations around a center point for mock data
-const generateLocation = (centerLat: number, centerLng: number, radiusKm: number = 5) => {
-  const earthRadius = 6371; // Earth's radius in km
-  const randomDistance = Math.random() * radiusKm;
-  const randomAngle = Math.random() * Math.PI * 2;
-  
-  const lat = centerLat + (randomDistance / earthRadius) * (180 / Math.PI);
-  const lng = centerLng + (randomDistance / earthRadius) * (180 / Math.PI) / Math.cos(centerLat * Math.PI / 180);
-  
-  return { lat, lng };
-};
-
-// Create mock mechanics data around New York City
-const generateMockMechanics = (count: number = 10): UserProfile[] => {
-  const centerLat = 40.7128;
-  const centerLng = -74.0060;
-  
-  const serviceOptions = [
-    'Engine Repair', 'Battery Replacement', 'Tire Change', 'Towing',
-    'Jump Start', 'Lockout Service', 'Oil Change', 'Brake Repair',
-    'Transmission Service', 'AC Service', 'Diagnostic', 'Fluid Check'
-  ];
-  
-  const availabilityOptions = [
-    '24/7 Emergency Service',
-    'Mon-Fri, 8am-6pm',
-    'Mon-Sat, 7am-9pm',
-    'Weekdays 9am-5pm, Weekends On-Call',
-    'By Appointment Only'
-  ];
-  
-  return Array(count).fill(null).map((_, index) => {
-    const location = generateLocation(centerLat, centerLng, 15);
-    const servicesCount = Math.floor(Math.random() * 5) + 1;
-    const services = Array(servicesCount).fill(null).map(() => 
-      serviceOptions[Math.floor(Math.random() * serviceOptions.length)]
-    ).filter((v, i, a) => a.indexOf(v) === i); // Remove duplicates
-    
-    return {
-      id: `mechanic-${index + 10}`,
-      name: `Mechanic ${index + 1}`,
-      email: `mechanic${index + 1}@example.com`,
-      role: 'mechanic' as const,
-      services,
-      location: {
-        address: `${Math.floor(Math.random() * 1000) + 100} ${String.fromCharCode(65 + Math.floor(Math.random() * 26))} St, New York`,
-        ...location
-      },
-      phoneNumber: `(${Math.floor(Math.random() * 900) + 100}) ${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 9000) + 1000}`,
-      availability: availabilityOptions[Math.floor(Math.random() * availabilityOptions.length)],
-      rating: Math.random() * 2 + 3 // Rating between 3 and 5
-    };
-  });
-};
-
 interface MechanicsContextType {
   mechanics: UserProfile[];
-  searchMechanics: (search: MechanicSearch) => UserProfile[];
+  searchMechanics: (search: MechanicSearch) => Promise<UserProfile[]>;
   searchParams: MechanicSearch;
   setSearchParams: React.Dispatch<React.SetStateAction<MechanicSearch>>;
   searchResults: UserProfile[];
@@ -81,19 +28,7 @@ export const MechanicsProvider = ({ children }: { children: ReactNode }) => {
   const [searchParams, setSearchParams] = useState<MechanicSearch>({});
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
   const [loadingMechanics, setLoadingMechanics] = useState<boolean>(false);
-
-  // Load mock mechanics on initial render
-  useEffect(() => {
-    setLoadingMechanics(true);
-    
-    // Simulate API call delay
-    setTimeout(() => {
-      const initialMechanics = generateMockMechanics(15);
-      setMechanics(initialMechanics);
-      setSearchResults(initialMechanics);
-      setLoadingMechanics(false);
-    }, 1000);
-  }, []);
+  const { toast } = useToast();
 
   // Calculate distance between two coordinates in km
   const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
@@ -110,54 +45,151 @@ export const MechanicsProvider = ({ children }: { children: ReactNode }) => {
     return R * c; // Distance in km
   };
 
-  // Search mechanics based on criteria
-  const searchMechanics = (search: MechanicSearch): UserProfile[] => {
-    setLoadingMechanics(true);
-    
-    // Generate a user location based on the search string (mock)
-    // In a real app, we would use geocoding API here
-    const userLocation = search.location
-      ? generateLocation(40.7128, -74.0060, 5) // Mock location near NYC
-      : null;
-
-    const results = mechanics.filter(mechanic => {
-      // Filter by service
-      if (search.service && mechanic.services && 
-          !mechanic.services.some(s => s.toLowerCase().includes(search.service!.toLowerCase()))) {
-        return false;
-      }
-
-      // Filter by rating
-      if (search.rating && mechanic.rating && mechanic.rating < search.rating) {
-        return false;
-      }
-
-      // Filter by distance if we have both user location and mechanic location
-      if (search.distance && search.distance > 0 && userLocation && mechanic.location) {
-        const distance = calculateDistance(
-          userLocation.lat,
-          userLocation.lng,
-          mechanic.location.lat,
-          mechanic.location.lng
-        );
-        if (distance > search.distance) {
-          return false;
+  // Load all mechanics on initial render
+  useEffect(() => {
+    const loadMechanics = async () => {
+      setLoadingMechanics(true);
+      
+      try {
+        // First get all profiles that are mechanics
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('role', 'mechanic');
+          
+        if (profilesError) {
+          throw profilesError;
         }
         
-        // Attach distance to mechanic object for display
-        (mechanic as any).distance = distance.toFixed(1);
+        if (!profilesData || profilesData.length === 0) {
+          setMechanics([]);
+          setSearchResults([]);
+          setLoadingMechanics(false);
+          return;
+        }
+        
+        // Get mechanic profile details for each mechanic
+        const mechanicProfiles: UserProfile[] = await Promise.all(
+          profilesData.map(async (profile) => {
+            const { data: mechanicData, error: mechanicError } = await supabase
+              .from('mechanic_profiles')
+              .select('*')
+              .eq('id', profile.id)
+              .single();
+              
+            if (mechanicError) {
+              console.error(`Error fetching mechanic details for ${profile.id}:`, mechanicError);
+              return null;
+            }
+            
+            return {
+              id: profile.id,
+              name: profile.name,
+              email: profile.email,
+              role: profile.role as 'mechanic',
+              phoneNumber: profile.phone_number,
+              services: mechanicData.services || [],
+              location: {
+                address: mechanicData.address,
+                lat: mechanicData.latitude,
+                lng: mechanicData.longitude
+              },
+              availability: mechanicData.availability,
+              rating: mechanicData.rating
+            };
+          })
+        );
+        
+        // Filter out any null results
+        const validProfiles = mechanicProfiles.filter(
+          (profile): profile is UserProfile => profile !== null
+        );
+        
+        setMechanics(validProfiles);
+        setSearchResults(validProfiles);
+      } catch (error) {
+        console.error('Error loading mechanics:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load mechanics. Please try again later.',
+          variant: 'destructive'
+        });
+      } finally {
+        setLoadingMechanics(false);
       }
+    };
+    
+    loadMechanics();
+  }, [toast]);
 
-      return true;
-    });
-
-    // Simulate API call delay
-    setTimeout(() => {
-      setSearchResults(results);
+  // Search mechanics based on criteria
+  const searchMechanics = async (search: MechanicSearch): Promise<UserProfile[]> => {
+    setLoadingMechanics(true);
+    
+    try {
+      // Start with all mechanics
+      let filteredResults = [...mechanics];
+      
+      // Filter by service
+      if (search.service) {
+        const serviceQuery = search.service.toLowerCase();
+        filteredResults = filteredResults.filter(mechanic => 
+          mechanic.services?.some(service => 
+            service.toLowerCase().includes(serviceQuery)
+          )
+        );
+      }
+      
+      // Filter by rating
+      if (search.rating && search.rating > 0) {
+        filteredResults = filteredResults.filter(mechanic => 
+          (mechanic.rating || 0) >= search.rating!
+        );
+      }
+      
+      // Filter by distance if location is provided
+      if (search.location && search.distance && search.distance > 0) {
+        // For now, use mock geocoding
+        const mockUserLocation = {
+          lat: 40.7128 + (Math.random() - 0.5) * 0.1,
+          lng: -74.0060 + (Math.random() - 0.5) * 0.1
+        };
+        
+        filteredResults = filteredResults.filter(mechanic => {
+          if (!mechanic.location?.lat || !mechanic.location?.lng) return false;
+          
+          const distance = calculateDistance(
+            mockUserLocation.lat,
+            mockUserLocation.lng,
+            mechanic.location.lat,
+            mechanic.location.lng
+          );
+          
+          // Add distance to mechanic object for display
+          (mechanic as any).distance = distance.toFixed(1);
+          
+          return distance <= search.distance!;
+        });
+        
+        // Sort by distance
+        filteredResults.sort((a, b) => {
+          return parseFloat((a as any).distance) - parseFloat((b as any).distance);
+        });
+      }
+      
+      setSearchResults(filteredResults);
+      return filteredResults;
+    } catch (error) {
+      console.error('Error searching mechanics:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to search mechanics. Please try again later.',
+        variant: 'destructive'
+      });
+      return [];
+    } finally {
       setLoadingMechanics(false);
-    }, 800);
-
-    return results;
+    }
   };
 
   return (
