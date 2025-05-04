@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,7 +15,7 @@ export interface UserProfile {
   role: UserRole;
   phoneNumber?: string;
   // For mechanics
-  services?: string[];
+  services?: string[] | string; // Allow both string array and string for flexibility during registration
   location?: {
     address: string;
     lat: number;
@@ -188,11 +189,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     try {
       // Format services correctly for the database
-      let serviceData = userData.services;
+      let serviceData: string[] | undefined = undefined;
+      
       if (role === 'mechanic' && userData.services) {
-        // Ensure services is properly formatted as an array of strings for Supabase
+        // Handle services based on type
         if (typeof userData.services === 'string') {
           serviceData = userData.services.split(',').map(s => s.trim());
+        } else if (Array.isArray(userData.services)) {
+          serviceData = userData.services;
         }
       }
       
