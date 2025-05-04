@@ -61,6 +61,7 @@ const Register = () => {
           lat: 0,
           lng: 0
         },
+        // Ensure services is sent as array - this was the issue
         services: services.split(',').map(s => s.trim()),
         availability
       } : {})
@@ -74,6 +75,7 @@ const Register = () => {
         description: "Please check your email to confirm your account."
       });
     } catch (error: any) {
+      console.error('Registration error:', error);
       setError(error.message || 'Failed to register. Please try again.');
     } finally {
       setIsSubmitting(false);

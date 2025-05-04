@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -59,8 +58,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (!data) return null;
 
+      // Ensure role is of type UserRole
+      const role = data.role as UserRole;
+      
       // If the user is a mechanic, fetch additional mechanic details
-      if (data.role === 'mechanic') {
+      if (role === 'mechanic') {
         const { data: mechanicData, error: mechanicError } = await supabase
           .from('mechanic_profiles')
           .select('*')
@@ -75,7 +77,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             id: data.id,
             name: data.name,
             email: data.email,
-            role: data.role,
+            role: role,
             phoneNumber: data.phone_number,
             services: mechanicData.services,
             location: {
@@ -95,7 +97,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         id: data.id,
         name: data.name,
         email: data.email,
-        role: data.role,
+        role: role,
         phoneNumber: data.phone_number
       };
       
@@ -185,6 +187,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     
     try {
+      // Format services correctly for the database
+      let serviceData = userData.services;
+      if (role === 'mechanic' && userData.services) {
+        // Ensure services is properly formatted as an array of strings for Supabase
+        if (typeof userData.services === 'string') {
+          serviceData = userData.services.split(',').map(s => s.trim());
+        }
+      }
+      
       // Create the auth user
       const { data, error } = await supabase.auth.signUp({
         email: userData.email!,
@@ -195,7 +206,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             role: role,
             // If mechanic, add additional data
             ...(role === 'mechanic' && {
-              services: userData.services,
+              services: serviceData,
               address: userData.location?.address,
               availability: userData.availability
             })
