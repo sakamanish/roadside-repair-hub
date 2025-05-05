@@ -10,7 +10,7 @@ import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { MapPin, Search as SearchIcon, Star } from 'lucide-react';
+import { MapPin, Search as SearchIcon, Star, Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const Search = () => {
@@ -21,12 +21,15 @@ const Search = () => {
     searchParams, 
     setSearchParams, 
     loadingMechanics,
-    searchMechanics
+    searchMechanics,
+    getCurrentLocation
   } = useMechanics();
   const [location, setLocation] = useState(searchParams.location);
   const [service, setService] = useState(searchParams.service);
   const [distance, setDistance] = useState(searchParams.distance);
   const [rating, setRating] = useState(searchParams.rating.toString());
+  const [usingCurrentLocation, setUsingCurrentLocation] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -51,6 +54,22 @@ const Search = () => {
     searchMechanics(updatedParams);
   };
 
+  // Handle "Use Current Location" button click
+  const handleUseCurrentLocation = async () => {
+    setLocationLoading(true);
+    try {
+      const position = await getCurrentLocation();
+      if (position) {
+        setLocation('Current Location');
+        setUsingCurrentLocation(true);
+      }
+    } catch (error) {
+      console.error('Error getting location:', error);
+    } finally {
+      setLocationLoading(false);
+    }
+  };
+
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8">
@@ -66,11 +85,24 @@ const Search = () => {
                     <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                       id="location"
-                      placeholder="City, Address"
+                      placeholder="City, Address or Use Current Location"
                       className="pl-9"
                       value={location}
-                      onChange={(e) => setLocation(e.target.value)}
+                      onChange={(e) => {
+                        setLocation(e.target.value);
+                        if (usingCurrentLocation) setUsingCurrentLocation(false);
+                      }}
                     />
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm"
+                      className="absolute right-1 top-1 h-8"
+                      onClick={handleUseCurrentLocation}
+                      disabled={locationLoading}
+                    >
+                      {locationLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Use My Location"}
+                    </Button>
                   </div>
                 </div>
                 
@@ -135,7 +167,10 @@ const Search = () => {
           </h2>
           
           {loadingMechanics ? (
-            <div className="text-center py-8">Loading...</div>
+            <div className="text-center py-8 flex items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin" />
+              <span className="ml-2">Searching for mechanics...</span>
+            </div>
           ) : searchResults.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {searchResults.map((mechanic) => (
@@ -156,6 +191,12 @@ const Search = () => {
                         <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
                         <span>{mechanic.location?.address || 'Address not provided'}</span>
                       </div>
+                      
+                      {(mechanic as any).distance && (
+                        <div className="mb-2 text-sm text-muted-foreground">
+                          <span className="font-medium">{(mechanic as any).distance} km away</span>
+                        </div>
+                      )}
                       
                       <div className="flex flex-wrap gap-1 mb-3">
                         {mechanic.services && (typeof mechanic.services === 'string' ? 

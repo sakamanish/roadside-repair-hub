@@ -18,6 +18,7 @@ interface MechanicsContextType {
   searchResults: UserProfile[];
   searchParams: SearchParams;
   setSearchParams: React.Dispatch<React.SetStateAction<SearchParams>>;
+  getCurrentLocation: () => Promise<GeolocationPosition | null>;
 }
 
 const MechanicsContext = createContext<MechanicsContextType | undefined>(undefined);
@@ -81,7 +82,12 @@ export const MechanicsProvider = ({ children }: { children: ReactNode }) => {
             return {
               ...profile,
               ...mechanicDetails,
-              services: mechanicDetails?.services || []
+              services: mechanicDetails?.services || [],
+              location: {
+                address: mechanicDetails?.address || '',
+                latitude: mechanicDetails?.latitude,
+                longitude: mechanicDetails?.longitude
+              }
             } as UserProfile;
           });
 
@@ -105,12 +111,60 @@ export const MechanicsProvider = ({ children }: { children: ReactNode }) => {
     fetchMechanics();
   }, [toast]);
 
+  // Get user's current location
+  const getCurrentLocation = (): Promise<GeolocationPosition | null> => {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) {
+        toast({
+          title: "Location Error",
+          description: "Geolocation is not supported by your browser",
+          variant: "destructive"
+        });
+        resolve(null);
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        position => {
+          resolve(position);
+        },
+        error => {
+          console.error('Error getting location:', error);
+          toast({
+            title: "Location Error",
+            description: "Unable to retrieve your location",
+            variant: "destructive"
+          });
+          resolve(null);
+        },
+        { timeout: 10000 }
+      );
+    });
+  };
+
+  // Calculate distance between two coordinates in kilometers
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // Radius of the earth in km
+    const dLat = deg2rad(lat2 - lat1);
+    const dLon = deg2rad(lon2 - lon1);
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2); 
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+    const d = R * c; // Distance in km
+    return d;
+  };
+
+  const deg2rad = (deg: number): number => {
+    return deg * (Math.PI/180);
+  };
+
   // Function to search for mechanics based on criteria
   const searchMechanics = async (params: SearchParams) => {
     setLoadingMechanics(true);
     try {
       // For now, client-side filtering based on available data
-      // In a real app, this would be a server-side query with spatial search
       
       if (mechanics.length === 0) {
         setSearchResults([]);
@@ -145,9 +199,41 @@ export const MechanicsProvider = ({ children }: { children: ReactNode }) => {
         filtered = filtered.filter(mechanic => (mechanic.rating || 0) >= params.rating);
       }
 
-      // For location, in a real app we'd use geocoding and distance calculation
-      // For now, simple text match on address
-      if (params.location) {
+      // For location, try to use coordinates if available
+      let userLocation: GeolocationPosition | null = null;
+      
+      // If location is specified, try to get user's current location
+      if (params.location.toLowerCase() === 'current location') {
+        userLocation = await getCurrentLocation();
+      }
+      
+      if (userLocation) {
+        const userLat = userLocation.coords.latitude;
+        const userLon = userLocation.coords.longitude;
+        
+        // Filter by distance if user location is available
+        filtered = filtered.filter(mechanic => {
+          if (!mechanic.location?.latitude || !mechanic.location?.longitude) return false;
+          
+          const distance = calculateDistance(
+            userLat,
+            userLon,
+            mechanic.location.latitude,
+            mechanic.location.longitude
+          );
+          
+          // Add distance to mechanic object for display
+          (mechanic as any).distance = distance.toFixed(1);
+          
+          return distance <= params.distance;
+        });
+        
+        // Sort by distance
+        filtered.sort((a, b) => {
+          return ((a as any).distance || 0) - ((b as any).distance || 0);
+        });
+      } else if (params.location && params.location.toLowerCase() !== 'current location') {
+        // Text match on address if coordinates aren't available
         filtered = filtered.filter(mechanic => {
           const address = mechanic.location?.address || '';
           return address.toLowerCase().includes(params.location.toLowerCase());
@@ -176,7 +262,8 @@ export const MechanicsProvider = ({ children }: { children: ReactNode }) => {
         searchMechanics,
         searchResults,
         searchParams,
-        setSearchParams
+        setSearchParams,
+        getCurrentLocation
       }}
     >
       {children}
