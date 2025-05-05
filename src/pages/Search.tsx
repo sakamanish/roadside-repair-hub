@@ -1,211 +1,199 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMechanics } from '@/contexts/MechanicsContext';
-import { useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/Layout';
+import { useAuth } from '@/contexts/AuthContext';
+import { useMechanics } from '@/contexts/MechanicsContext';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import MechanicCard from '@/components/MechanicCard';
-import { Search as SearchIcon, Filter } from 'lucide-react';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
-import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent } from '@/components/ui/card';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { MapPin, Search as SearchIcon, Star } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const Search = () => {
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const { 
-    searchMechanics, 
     searchResults, 
     searchParams, 
-    setSearchParams,
-    loadingMechanics
+    setSearchParams, 
+    loadingMechanics,
+    searchMechanics
   } = useMechanics();
-  
-  const [locationInput, setLocationInput] = useState(searchParams.location || '');
-  const [serviceInput, setServiceInput] = useState(searchParams.service || '');
-  const [distanceInput, setDistanceInput] = useState<number[]>([searchParams.distance || 10]);
-  const [ratingInput, setRatingInput] = useState<string>(searchParams.rating?.toString() || '');
-  
-  // Redirect if user is not authenticated or is a mechanic
+  const [location, setLocation] = useState(searchParams.location);
+  const [service, setService] = useState(searchParams.service);
+  const [distance, setDistance] = useState(searchParams.distance);
+  const [rating, setRating] = useState(searchParams.rating.toString());
+
+  // Redirect if not authenticated
   useEffect(() => {
-    if (isAuthenticated && user?.role !== 'customer') {
-      navigate('/');
-    } else if (!isAuthenticated) {
+    if (!isAuthenticated) {
       navigate('/login');
     }
-  }, [isAuthenticated, user, navigate]);
+  }, [isAuthenticated, navigate]);
 
-  const handleSearch = () => {
-    const params = {
-      location: locationInput,
-      service: serviceInput,
-      distance: distanceInput[0],
-      rating: ratingInput ? parseFloat(ratingInput) : undefined
+  // Handle form submission
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Update search parameters in context
+    const updatedParams = {
+      location,
+      service,
+      distance,
+      rating: parseInt(rating)
     };
     
-    setSearchParams(params);
-    searchMechanics(params);
+    setSearchParams(updatedParams);
+    searchMechanics(updatedParams);
   };
 
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold mb-2">Find a Mechanic</h1>
-          <p className="text-muted-foreground mb-6">
-            Search for mechanics in your area who can help with your vehicle issues
-          </p>
-          
-          <div className="bg-white rounded-lg border p-4 mb-8">
-            <div className="flex flex-col md:flex-row gap-4 mb-4">
-              <div className="flex-1">
-                <Label htmlFor="location">Your Location</Label>
-                <div className="mt-1.5 relative">
+        <h1 className="text-2xl font-bold mb-6 text-center">Find a Mechanic</h1>
+        
+        <Card className="mb-8">
+          <CardContent className="pt-6">
+            <form onSubmit={handleSearch} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="location">Location</Label>
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="location"
+                      placeholder="City, Address"
+                      className="pl-9"
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="service">Service Needed</Label>
                   <Input
-                    id="location"
-                    placeholder="Enter your address or area"
-                    value={locationInput}
-                    onChange={(e) => setLocationInput(e.target.value)}
-                    className="pr-10"
+                    id="service"
+                    placeholder="E.g. Battery Replacement, Tire Change"
+                    value={service}
+                    onChange={(e) => setService(e.target.value)}
                   />
-                  <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 </div>
               </div>
               
-              <div className="flex-1">
-                <Label htmlFor="service">Service Needed</Label>
-                <Input
-                  id="service"
-                  placeholder="E.g. Tire change, Battery, Engine..."
-                  value={serviceInput}
-                  onChange={(e) => setServiceInput(e.target.value)}
-                  className="mt-1.5"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="distance">Distance (up to {distance} miles)</Label>
+                  <Slider
+                    id="distance"
+                    min={1}
+                    max={50}
+                    step={1}
+                    value={[distance]}
+                    onValueChange={(values) => setDistance(values[0])}
+                    className="py-4"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="rating">Minimum Rating</Label>
+                  <Select 
+                    value={rating} 
+                    onValueChange={setRating}
+                  >
+                    <SelectTrigger id="rating">
+                      <SelectValue placeholder="Any Rating" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Any Rating</SelectItem>
+                      <SelectItem value="1">1+ Stars</SelectItem>
+                      <SelectItem value="2">2+ Stars</SelectItem>
+                      <SelectItem value="3">3+ Stars</SelectItem>
+                      <SelectItem value="4">4+ Stars</SelectItem>
+                      <SelectItem value="5">5 Stars</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <Sheet>
-                <SheetTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <Filter className="h-4 w-4 mr-2" />
-                    More Filters
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="right">
-                  <SheetHeader>
-                    <SheetTitle>Filter Mechanics</SheetTitle>
-                    <SheetDescription>
-                      Refine your search results
-                    </SheetDescription>
-                  </SheetHeader>
-                  <div className="mt-6 space-y-6">
-                    <div className="space-y-2">
-                      <Label>Distance (km)</Label>
-                      <div className="pt-4">
-                        <Slider
-                          value={distanceInput}
-                          min={1}
-                          max={50}
-                          step={1}
-                          onValueChange={setDistanceInput}
-                        />
-                        <div className="flex justify-between mt-2">
-                          <span className="text-sm text-muted-foreground">1km</span>
-                          <span className="text-sm font-medium">{distanceInput[0]}km</span>
-                          <span className="text-sm text-muted-foreground">50km</span>
+              
+              <Button type="submit" className="w-full md:w-auto">
+                <SearchIcon className="mr-2 h-4 w-4" /> Search
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+        
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold">
+            {loadingMechanics ? 'Searching...' : 
+             searchResults.length > 0 ? `Found ${searchResults.length} mechanics` : 
+             'No mechanics found'}
+          </h2>
+          
+          {loadingMechanics ? (
+            <div className="text-center py-8">Loading...</div>
+          ) : searchResults.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {searchResults.map((mechanic) => (
+                <Card key={mechanic.id} className="overflow-hidden">
+                  <CardContent className="p-0">
+                    <div className="p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-bold">{mechanic.name}</h3>
+                        <div className="flex items-center">
+                          <Star className="h-4 w-4 fill-yellow-400 text-yellow-400 mr-1" />
+                          <span className="text-sm">
+                            {mechanic.rating ? mechanic.rating.toFixed(1) : 'N/A'}
+                          </span>
                         </div>
                       </div>
-                    </div>
-                    
-                    <Separator />
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="rating">Minimum Rating</Label>
-                      <Select
-                        value={ratingInput}
-                        onValueChange={setRatingInput}
+                      
+                      <div className="flex items-start space-x-2 text-sm text-muted-foreground mb-3">
+                        <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
+                        <span>{mechanic.location?.address || 'Address not provided'}</span>
+                      </div>
+                      
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {mechanic.services && (typeof mechanic.services === 'string' ? 
+                          mechanic.services.split(',').map((service, idx) => (
+                            <span key={idx} className="bg-muted px-2 py-1 rounded-full text-xs">
+                              {service.trim()}
+                            </span>
+                          )) : 
+                          Array.isArray(mechanic.services) && mechanic.services.map((service, idx) => (
+                            <span key={idx} className="bg-muted px-2 py-1 rounded-full text-xs">
+                              {service}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                      
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => navigate(`/mechanic/${mechanic.id}`)}
                       >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Any Rating" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="">Any Rating</SelectItem>
-                          <SelectItem value="3">3+ Stars</SelectItem>
-                          <SelectItem value="4">4+ Stars</SelectItem>
-                          <SelectItem value="4.5">4.5+ Stars</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        View Profile
+                      </Button>
                     </div>
-                    
-                    <Separator />
-                    
-                    <Button onClick={handleSearch} className="w-full">
-                      Apply Filters
-                    </Button>
-                  </div>
-                </SheetContent>
-              </Sheet>
-              
-              <Button onClick={handleSearch} disabled={loadingMechanics}>
-                <SearchIcon className="h-4 w-4 mr-2" />
-                Search
-              </Button>
-            </div>
-          </div>
-          
-          <div className="mb-4">
-            {loadingMechanics ? (
-              <p className="text-muted-foreground">Searching for mechanics...</p>
-            ) : searchResults.length > 0 ? (
-              <p className="text-muted-foreground">Found {searchResults.length} mechanics</p>
-            ) : (
-              <p className="text-muted-foreground">No mechanics found. Try adjusting your search.</p>
-            )}
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {loadingMechanics ? (
-              // Loading skeletons
-              Array(4).fill(null).map((_, index) => (
-                <Card key={index} className="p-6">
-                  <div className="flex items-center space-x-4 mb-4">
-                    <Skeleton className="h-10 w-10 rounded-full" />
-                    <div className="space-y-2">
-                      <Skeleton className="h-4 w-[150px]" />
-                      <Skeleton className="h-4 w-[100px]" />
-                    </div>
-                  </div>
-                  <div className="space-y-2 mb-4">
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-full" />
-                  </div>
-                  <div className="flex justify-between">
-                    <Skeleton className="h-9 w-[100px]" />
-                    <Skeleton className="h-9 w-[100px]" />
-                  </div>
+                  </CardContent>
                 </Card>
-              ))
-            ) : (
-              searchResults.map(mechanic => (
-                <MechanicCard key={mechanic.id} mechanic={mechanic} />
-              ))
-            )}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No mechanics found matching your criteria.</p>
+              <p className="text-muted-foreground">Try adjusting your search parameters.</p>
+            </div>
+          )}
         </div>
       </div>
     </Layout>
   );
-};
-
-const MapPin = (props: React.ComponentProps<typeof SearchIcon>) => {
-  return <SearchIcon {...props} />;
 };
 
 export default Search;

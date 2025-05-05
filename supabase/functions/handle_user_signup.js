@@ -34,19 +34,22 @@ export async function handleUserSignup(event, context) {
       if (raw_user_meta_data.services) {
         if (typeof raw_user_meta_data.services === 'string') {
           // Parse string services
-          services = raw_user_meta_data.services.split(',').map(s => s.trim());
+          services = raw_user_meta_data.services.split(',').map(s => s.trim()).filter(s => s !== '');
         } else if (Array.isArray(raw_user_meta_data.services)) {
           // Already an array
           services = raw_user_meta_data.services;
         }
       }
       
+      // Get address location (you would ideally use a geocoding service here)
+      const address = raw_user_meta_data.address || '';
+      
       await supabaseClient
         .from('mechanic_profiles')
         .insert({
           id: user.id,
           services: services,
-          address: raw_user_meta_data.address || '',
+          address: address,
           availability: raw_user_meta_data.availability || ''
         });
     }

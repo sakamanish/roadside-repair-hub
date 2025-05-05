@@ -189,12 +189,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     try {
       // Format services correctly for the database
+      // Ensure services is properly formatted whether it's a string or array
       let serviceData: string[] | undefined;
       
       if (role === 'mechanic' && userData.services) {
         // Handle services based on type
         if (typeof userData.services === 'string') {
-          serviceData = userData.services.split(',').map(s => s.trim());
+          // Split by comma and trim each service, remove empty strings
+          serviceData = userData.services.split(',')
+            .map(s => s.trim())
+            .filter(s => s !== '');
         } else if (Array.isArray(userData.services)) {
           serviceData = userData.services;
         }
@@ -214,6 +218,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           data: {
             name: userData.name,
             role: role,
+            phoneNumber: userData.phoneNumber,
             // If mechanic, add additional data
             ...(role === 'mechanic' && {
               services: serviceData,
