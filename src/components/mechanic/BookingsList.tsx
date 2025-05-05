@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Calendar, BookOpen } from 'lucide-react';
+import { Calendar, BookOpen, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Booking } from '@/types/booking';
@@ -23,9 +23,22 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, loadingBookings }
     });
   };
 
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case 'confirmed':
+        return <Clock className="h-4 w-4 text-blue-600" />;
+      case 'canceled':
+        return <AlertCircle className="h-4 w-4 text-red-600" />;
+      default:
+        return <Clock className="h-4 w-4 text-yellow-600" />;
+    }
+  };
+
   return (
-    <Card className="max-w-3xl mx-auto mt-6">
-      <CardHeader className="bg-gradient-to-r from-bb-blue-light to-bb-blue-dark text-white rounded-t-lg">
+    <Card className="max-w-3xl mx-auto mt-6 overflow-hidden border-0 shadow-md">
+      <CardHeader className="bg-gradient-to-r from-bb-blue-light to-bb-blue-dark text-white">
         <CardTitle className="text-xl flex items-center gap-2">
           <BookOpen className="h-5 w-5" />
           Booking History
@@ -41,7 +54,7 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, loadingBookings }
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="bg-muted/50">
+                <TableRow>
                   <TableHead className="font-semibold">Service</TableHead>
                   <TableHead className="font-semibold">Scheduled For</TableHead>
                   <TableHead className="font-semibold">Location</TableHead>
@@ -50,7 +63,7 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, loadingBookings }
               </TableHeader>
               <TableBody>
                 {bookings.map(booking => (
-                  <TableRow key={booking.id} className="hover:bg-muted/30 transition-colors">
+                  <TableRow key={booking.id} className="hover:bg-muted/20 transition-colors">
                     <TableCell className="font-medium">{booking.service}</TableCell>
                     <TableCell className="whitespace-nowrap">
                       <div className="flex items-center">
@@ -62,14 +75,17 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, loadingBookings }
                       {booking.location || 'No location specified'}
                     </TableCell>
                     <TableCell>
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                        booking.status === 'completed' ? 'bg-green-100 text-green-800' :
-                        booking.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
-                        booking.status === 'canceled' ? 'bg-red-100 text-red-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {getStatusIcon(booking.status)}
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                          booking.status === 'completed' ? 'bg-green-100 text-green-800' :
+                          booking.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
+                          booking.status === 'canceled' ? 'bg-red-100 text-red-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                        </span>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -77,12 +93,12 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, loadingBookings }
             </Table>
           </div>
         ) : (
-          <div className="text-center py-8 px-4 bg-muted/10">
-            <div className="rounded-full bg-muted/30 p-3 w-fit mx-auto">
+          <div className="text-center py-12 px-4 bg-muted/5">
+            <div className="rounded-full bg-muted/20 p-3 w-fit mx-auto">
               <Calendar className="h-6 w-6 text-muted-foreground" />
             </div>
-            <p className="mt-2 text-muted-foreground">No bookings found</p>
-            <p className="text-sm text-muted-foreground">
+            <p className="mt-4 font-medium">No bookings found</p>
+            <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
               Book a service with this mechanic to see your appointments here
             </p>
           </div>
