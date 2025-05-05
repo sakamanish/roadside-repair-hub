@@ -85,8 +85,8 @@ export const MechanicsProvider = ({ children }: { children: ReactNode }) => {
               services: mechanicDetails?.services || [],
               location: {
                 address: mechanicDetails?.address || '',
-                latitude: mechanicDetails?.latitude,
-                longitude: mechanicDetails?.longitude
+                lat: mechanicDetails?.latitude || 0,
+                lng: mechanicDetails?.longitude || 0
               }
             } as UserProfile;
           });
@@ -213,13 +213,13 @@ export const MechanicsProvider = ({ children }: { children: ReactNode }) => {
         
         // Filter by distance if user location is available
         filtered = filtered.filter(mechanic => {
-          if (!mechanic.location?.latitude || !mechanic.location?.longitude) return false;
+          if (!mechanic.location?.lat || !mechanic.location?.lng) return false;
           
           const distance = calculateDistance(
             userLat,
             userLon,
-            mechanic.location.latitude,
-            mechanic.location.longitude
+            mechanic.location.lat,
+            mechanic.location.lng
           );
           
           // Add distance to mechanic object for display

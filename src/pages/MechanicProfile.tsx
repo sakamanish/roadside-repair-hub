@@ -1,25 +1,21 @@
 
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import Layout from '@/components/Layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Wrench, Star, MapPin, Calendar, Phone, MessageCircle } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
-import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import BookingForm from '@/components/BookingForm';
 import { useAuth } from '@/contexts/AuthContext';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Booking } from '@/types/booking';
 
-// Add a helper function to normalize services
-const getServicesArray = (services?: string[] | string): string[] => {
-  if (!services) return [];
-  if (typeof services === 'string') return services.split(',').map(s => s.trim());
-  return services;
-};
+// Import refactored components
+import MechanicHeader from '@/components/mechanic/MechanicHeader';
+import MechanicDetails from '@/components/mechanic/MechanicDetails';
+import ReviewsList from '@/components/mechanic/ReviewsList';
+import BookingsList from '@/components/mechanic/BookingsList';
 
 interface Review {
   id: string;
@@ -72,15 +68,10 @@ const MechanicProfile = () => {
           return;
         }
         
-        // Combine the data
-        const mechanicProfile = {
+        setMechanic({
           ...profileData,
-          ...mechanicData,
-          // Format services for display
-          services: getServicesArray(mechanicData.services)
-        };
-        
-        setMechanic(mechanicProfile);
+          ...mechanicData
+        });
       } catch (error) {
         console.error('Error:', error);
         toast({
@@ -180,7 +171,7 @@ const MechanicProfile = () => {
         }
         
         if (bookingsData) {
-          setBookings(bookingsData);
+          setBookings(bookingsData as Booking[]);
         } else {
           setBookings([]);
         }
@@ -208,17 +199,6 @@ const MechanicProfile = () => {
     setBookingOpen(true);
   };
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return 'Not scheduled';
-    return new Date(dateString).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
   if (loading) {
     return (
       <Layout>
@@ -243,66 +223,19 @@ const MechanicProfile = () => {
     <Layout>
       <div className="container mx-auto px-4 py-8">
         <Card className="max-w-3xl mx-auto mb-6">
-          <CardHeader className="flex flex-row items-center gap-4">
-            <div className="rounded-full bg-bb-orange p-3">
-              <Wrench className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <CardTitle className="text-2xl">{mechanic.name}</CardTitle>
-              <CardDescription className="flex items-center gap-1">
-                {mechanic.rating ? (
-                  <>
-                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                    <span>{mechanic.rating.toFixed(1)} ({mechanic.rate_count || 0} reviews)</span>
-                  </>
-                ) : (
-                  <span>No ratings yet</span>
-                )}
-              </CardDescription>
-            </div>
-          </CardHeader>
+          <MechanicHeader 
+            name={mechanic.name} 
+            rating={mechanic.rating} 
+            rateCount={mechanic.rate_count} 
+          />
           
           <CardContent className="space-y-4">
-            <div className="flex items-start gap-2">
-              <MapPin className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
-              <div>
-                <h3 className="font-medium">Location</h3>
-                <p className="text-muted-foreground">{mechanic.address}</p>
-              </div>
-            </div>
-            
-            <div className="flex items-start gap-2">
-              <Phone className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
-              <div>
-                <h3 className="font-medium">Contact</h3>
-                <p className="text-muted-foreground">{mechanic.phone_number || "Contact information not provided"}</p>
-              </div>
-            </div>
-            
-            <div className="flex items-start gap-2">
-              <Calendar className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
-              <div>
-                <h3 className="font-medium">Availability</h3>
-                <p className="text-muted-foreground">{mechanic.availability || "Availability information not provided"}</p>
-              </div>
-            </div>
-            
-            <Separator />
-            
-            <div>
-              <h3 className="font-medium mb-2">Services Offered</h3>
-              <div className="flex flex-wrap gap-2">
-                {mechanic.services && mechanic.services.length > 0 ? (
-                  mechanic.services.map((service: string, index: number) => (
-                    <div key={index} className="bg-muted px-3 py-1 rounded-full text-sm">
-                      {service}
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-muted-foreground">No services listed</p>
-                )}
-              </div>
-            </div>
+            <MechanicDetails 
+              address={mechanic.address}
+              phoneNumber={mechanic.phone_number}
+              availability={mechanic.availability}
+              services={mechanic.services}
+            />
             
             <div className="pt-4">
               <Dialog open={bookingOpen} onOpenChange={setBookingOpen}>
@@ -328,93 +261,11 @@ const MechanicProfile = () => {
         </Card>
 
         {/* Reviews Section */}
-        <Card className="max-w-3xl mx-auto mb-6">
-          <CardHeader>
-            <CardTitle className="text-xl flex items-center gap-2">
-              <MessageCircle className="h-5 w-5" />
-              Reviews
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {loadingReviews ? (
-              <div className="text-center py-4">Loading reviews...</div>
-            ) : reviews.length > 0 ? (
-              <div className="space-y-4">
-                {reviews.map(review => (
-                  <div key={review.id} className="border-b pb-4 last:border-b-0">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="font-medium">{review.customer_name}</span>
-                      <div className="flex items-center">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`h-4 w-4 ${i < review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                    {review.comment && (
-                      <p className="text-sm text-muted-foreground">{review.comment}</p>
-                    )}
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {new Date(review.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-center text-muted-foreground">No reviews yet</p>
-            )}
-          </CardContent>
-        </Card>
+        <ReviewsList reviews={reviews} loadingReviews={loadingReviews} />
 
         {/* Bookings Section - Only show if user is logged in */}
         {isAuthenticated && (
-          <Card className="max-w-3xl mx-auto">
-            <CardHeader>
-              <CardTitle className="text-xl flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Your Bookings
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loadingBookings ? (
-                <div className="text-center py-4">Loading bookings...</div>
-              ) : bookings.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Service</TableHead>
-                        <TableHead>Scheduled For</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {bookings.map(booking => (
-                        <TableRow key={booking.id}>
-                          <TableCell className="font-medium">{booking.service}</TableCell>
-                          <TableCell>{formatDate(booking.scheduled_for)}</TableCell>
-                          <TableCell>
-                            <span className={`px-2 py-1 rounded-full text-xs ${
-                              booking.status === 'completed' ? 'bg-green-100 text-green-800' :
-                              booking.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
-                              booking.status === 'canceled' ? 'bg-red-100 text-red-800' :
-                              'bg-yellow-100 text-yellow-800'
-                            }`}>
-                              {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              ) : (
-                <p className="text-center text-muted-foreground">No bookings found</p>
-              )}
-            </CardContent>
-          </Card>
+          <BookingsList bookings={bookings} loadingBookings={loadingBookings} />
         )}
       </div>
     </Layout>
